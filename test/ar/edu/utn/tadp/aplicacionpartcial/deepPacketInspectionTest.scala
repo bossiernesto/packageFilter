@@ -9,37 +9,37 @@ object IPTypes {
 
   implicit class IPAddrTupleComparable[T1, T2, T3, T4](t: (T1, T2, T3, T4)) {
     type R = (T1, T2, T3, T4)
-    def equal_than(other: R)(implicit ord: Ordering[R]): Boolean = ord.equiv(t, other)
+    def equalThan(other: R)(implicit ord: Ordering[R]): Boolean = ord.equiv(t, other)
   }
 
   //Creo una type class para comparacion y extraccion de un IPAddress
   trait ipaddr[T] {
-    def cmp_addr(x: T, y: T): Boolean
-    def get_1st_part(x: T): Int
-    def get_2nd_part(x: T): Int
-    def get_3rd_part(x: T): Int
-    def get_4rd_part(x: T): Int
-    def get_ip(x: T): IPAddrTuple
+    def cmpAddr(x: T, y: T): Boolean
+    def get1stPart(x: T): Int
+    def get2ndPart(x: T): Int
+    def get3rdPart(x: T): Int
+    def get4rdPart(x: T): Int
+    def getIp(x: T): IPAddrTuple
   }
   object ipaddr {
     implicit object ippaddrTuple extends ipaddr[IPAddrTuple] {
-      def cmp_addr(x: IPAddrTuple, y: IPAddrTuple): Boolean = x.equal_than(y)
-      def get_1st_part(x: IPAddrTuple): Int = x._1
-      def get_2nd_part(x: IPAddrTuple): Int = x._2
-      def get_3rd_part(x: IPAddrTuple): Int = x._3
-      def get_4rd_part(x: IPAddrTuple): Int = x._4
-      def get_ip(x: IPAddrTuple): IPAddrTuple = x
+      def cmpAddr(x: IPAddrTuple, y: IPAddrTuple): Boolean = x.equalThan(y)
+      def get1stPart(x: IPAddrTuple): Int = x._1
+      def get2ndPart(x: IPAddrTuple): Int = x._2
+      def get3rdPart(x: IPAddrTuple): Int = x._3
+      def get4rdPart(x: IPAddrTuple): Int = x._4
+      def getIp(x: IPAddrTuple): IPAddrTuple = x
     }
     implicit object ippaddrString extends ipaddr[String] {
       def separate(x: String): (Int, Int, Int, Int) = x.split("\\.") match {
         case Array(s1, s2, s3, s4) => (s1.toInt, s2.toInt, s3.toInt, s4.toInt)
       }
-      def cmp_addr(x: String, y: String): Boolean = x == y
-      def get_1st_part(x: String): Int = separate(x)._1
-      def get_2nd_part(x: String): Int = separate(x)._2
-      def get_3rd_part(x: String): Int = separate(x)._3
-      def get_4rd_part(x: String): Int = separate(x)._4
-      def get_ip(x: String): IPAddrTuple = separate(x)
+      def cmpAddr(x: String, y: String): Boolean = x == y
+      def get1stPart(x: String): Int = separate(x)._1
+      def get2ndPart(x: String): Int = separate(x)._2
+      def get3rdPart(x: String): Int = separate(x)._3
+      def get4rdPart(x: String): Int = separate(x)._4
+      def getIp(x: String): IPAddrTuple = separate(x)
     }
   }
 
@@ -73,31 +73,31 @@ object deepPacketInspection {
   type TriTuple = (Int, Int, Int) => Boolean
 
   /*comparators*/
-  val greater_than: TupleComp = _ > _
-  val geater_equal_curr: TupleCompCurr = greater_than.curried
+  val greaterThan: TupleComp = _ > _
+  val geaterEqualCurr: TupleCompCurr = greaterThan.curried
 
-  val greater_equal: TupleComp = _ >= _
-  val greater_equal_curr: TupleCompCurr = greater_equal.curried
+  val greaterEqual: TupleComp = _ >= _
+  val greaterEqualCurr: TupleCompCurr = greaterEqual.curried
 
-  val less_than: TupleComp = _ < _
-  val less_than_curr: TupleCompCurr = less_than.curried
+  val lessThan: TupleComp = _ < _
+  val lessThanCurr: TupleCompCurr = lessThan.curried
 
-  val less_equal: TupleComp = _ <= _
-  val less_equal_curr: TupleCompCurr = less_equal.curried
+  val lessEqual: TupleComp = _ <= _
+  val lessEqualCurr: TupleCompCurr = lessEqual.curried
 
   val equal: TupleComp = _ == _
   val equalCurr: TupleCompCurr = equal.curried
 
   val contains: TupleData = _ contains _
-  val contains_curr: TupleDataCurr = contains.curried
+  val containsCurr: TupleDataCurr = contains.curried
 
   val validIPRange = (x: Int, from: Int, to: Int) => from <= x && x <= to
-  /*Contraints*/
+  /*Cosntraints*/
 
   //(implicit ip_addr: ipaddr[T])
   def sourceIPConstraint[T: ipaddr](tupl: TriTuple)(from: Int)(to: Int)(packet: IPPacket[T]): Boolean = {
     val ip_addr = implicitly[ipaddr[T]]
-    val value = ip_addr.get_1st_part(packet.source_ip)
+    val value = ip_addr.get1stPart(packet.source_ip)
     tupl(value, from, to)
   }
 
@@ -119,9 +119,9 @@ object deepPacketInspection {
   val supported_version = 4
   val shellcode_example = "\\x31\\xc0\\x66\\xba\\x0e\\x27\\x66\\x81\\xea\\x06\\x27\\xb0\\x37\\xcd\\x80"
 
-  def packetSizeMax[T]: IPPacket[T] => Boolean = constrainFunction(less_equal)(max_packet_size)
+  def packetSizeMax[T]: IPPacket[T] => Boolean = constrainFunction(lessEqual)(max_packet_size)
   def versionSupported[T]: IPPacket[T] => Boolean = constrainFunctionVersion(equal)(supported_version)
-  def ttlGreaterThan0[T]: IPPacket[T] => Boolean = constrainFunctionTTL(greater_than)(0)
+  def ttlGreaterThan0[T]: IPPacket[T] => Boolean = constrainFunctionTTL(greaterThan)(0)
   def dataWithShellcode[T]: IPPacket[T] => Boolean = constraintFunctionData(contains)(shellcode_example)
   def validSourceIPAddress[T: ipaddr]: IPPacket[T] => Boolean = {
     val ip_addr = implicitly[ipaddr[T]]
@@ -163,7 +163,7 @@ class DPITest {
     import IPTypes.IPAddrTupleComparable
     val dir1: IPTypes.IPAddrTuple = (12, 2, 4, 5)
     val dir2: IPTypes.IPAddrTuple = (12, 2, 4, 5)
-    assertTrue(dir1.equal_than(dir2))
+    assertTrue(dir1.equalThan(dir2))
   }
 
   /*test type class IPAddress*/
@@ -172,7 +172,7 @@ class DPITest {
     val ips = List("12.34.34.1", "122.53.51.1", "344.12.55.1")
     import IPTypes._
     def lessThan255[T](xs: List[T])(implicit ev: ipaddr[T]): List[T] = {
-      xs.filter(p => ev.get_1st_part(p) < 255)
+      xs.filter(p => ev.get1stPart(p) < 255)
     }
 
     assertEquals(lessThan255(ips), List("12.34.34.1", "122.53.51.1"))
@@ -184,7 +184,7 @@ class DPITest {
     val ips = List((12, 34, 34, 1), (122, 53, 51, 1), (344, 12, 55, 1))
     import IPTypes._
     def lessThan255[T](xs: List[T])(implicit ev: ipaddr[T]): List[T] = {
-      xs.filter(p => ev.get_1st_part(p) < 255)
+      xs.filter(p => ev.get1stPart(p) < 255)
     }
 
     assertEquals(lessThan255(ips), List((12, 34, 34, 1), (122, 53, 51, 1)))
@@ -198,7 +198,7 @@ class DPITest {
     import IPTypes._
 
     def comp_ips[T](ip1: T, ip2: T)(implicit ip: ipaddr[T]): Boolean = {
-      ip.cmp_addr(ip1, ip2)
+      ip.cmpAddr(ip1, ip2)
     }
 
     assertFalse(comp_ips(ip1, ip2))
@@ -211,7 +211,7 @@ class DPITest {
     import IPTypes._
 
     def comp_ips[T](ip1: T, ip2: T)(implicit ip: ipaddr[T]): Boolean = {
-      ip.cmp_addr(ip1, ip2)
+      ip.cmpAddr(ip1, ip2)
     }
 
     assertTrue(comp_ips(ip1, ip2))
@@ -220,12 +220,12 @@ class DPITest {
   /*test comparators*/
   @Test
   def `4 es menor que 6....` = {
-    assertTrue(deepPacketInspection.less_than(4, 6))
+    assertTrue(deepPacketInspection.lessThan(4, 6))
   }
 
   @Test
   def `4 es menor que 6.... con currificacion...` = {
-    assertTrue(deepPacketInspection.less_than_curr(4)(6))
+    assertTrue(deepPacketInspection.lessThanCurr(4)(6))
   }
 
   @Test
@@ -235,7 +235,7 @@ class DPITest {
 
   @Test
   def `test comparator not contains` = {
-    assertFalse(deepPacketInspection.contains_curr("The grey fox")("something"))
+    assertFalse(deepPacketInspection.containsCurr("The grey fox")("something"))
   }
 
   /*Test package filters*/
