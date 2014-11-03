@@ -16,6 +16,7 @@ class UnidadesFactory(valor: Int) {
   def gramos = Gramos(valor)
   def milligramos = MilliGramos(valor)
 }
+
 class ImplicitsTest {
 
   @Test
@@ -34,13 +35,19 @@ class ImplicitsTest {
 
   }
 
-  implicit def kilosToGramos(k: Kilos): Gramos = Gramos(k.peso * 1000)
-  implicit def milligramosToGramos(m: MilliGramos): Gramos = Gramos(m.peso / 1000)
+  implicit def kilosToGramos(k: Kilos): Gramos = 
+    Gramos(k.peso * 1000)
+  
+  implicit def milligramosToGramos(m: MilliGramos): Gramos = 
+    Gramos(m.peso / 1000)
 
-  implicit def intToUnidadesFactory(i: Int): UnidadesFactory = new UnidadesFactory(i)
+  implicit def intToUnidadesFactory(i: Int): UnidadesFactory = 
+    new UnidadesFactory(i)
 
   def mezclar(elemento: Elemento, otroElemento: Elemento) =
-    Elemento(elemento.nombre + otroElemento.nombre, Gramos(elemento.cantidad.peso + otroElemento.cantidad.peso))
+    Elemento(elemento.nombre + otroElemento.nombre, 
+        Gramos(elemento.cantidad.peso + 
+            otroElemento.cantidad.peso))
 
   @Test
   def `unidades conversion parameter` = {
@@ -55,7 +62,7 @@ class ImplicitsTest {
   @Test
   def `unidades conversion receiver` = {
 
-    val mercurio = Elemento("Mercurio", 1 kilos)
+    val mercurio = Elemento("Mercurio", new Kilos(1))
     val potasio = Elemento("Potasio", 200000 milligramos)
 
     val mp = mezclar(mercurio, potasio)
@@ -67,7 +74,14 @@ class ImplicitsTest {
   @Test
   def `sum unidades ` = {
     assertEquals(Gramos(3), Gramos(1) + Gramos(2))
-    assertEquals(Gramos(1201), 1.kilos + 200.gramos + 1000.milligramos)
+    assertEquals(Gramos(1201), 1.kilos + 200.gramos 
+        + 1000.milligramos)
   }
 
 }
+
+
+
+
+
+

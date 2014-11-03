@@ -91,11 +91,12 @@ object deepPacketInspection {
   val contains: TupleData = _ contains _
   val contains_curr: TupleDataCurr = contains.curried
 
-  def valid_ip_segment(x: Int, y: Int, z: Int): Boolean = y <= x && x <= z
+  val validIPRange = (x: Int, from: Int, to: Int) => from <= x && x <= to
   /*Contraints*/
 
   //(implicit ip_addr: ipaddr[T])
-  def sourceIPConstraint[T](tupl: TriTuple)(from: Int)(to: Int)(packet: IPPacket[T])(implicit ip_addr: ipaddr[T]):Boolean = {
+  def sourceIPConstraint[T: ipaddr](tupl: TriTuple)(from: Int)(to: Int)(packet: IPPacket[T]): Boolean = {
+    val ip_addr = implicitly[ipaddr[T]]
     val value = ip_addr.get_1st_part(packet.source_ip)
     tupl(value, from, to)
   }
@@ -110,7 +111,9 @@ object deepPacketInspection {
   def constrainFunctionVersion[T]: TupleComp => Int => IPPacket[T] => Boolean = versionConstraint _
   def constrainFunctionTTL[T]: TupleComp => Int => IPPacket[T] => Boolean = ttlConstraint _
   def constraintFunctionData[T]: TupleData => String => IPPacket[T] => Boolean = dataConstraint _
-  def constraintFunctionSourceIP[T]: TriTuple => Int => Int => IPPacket[T] => Boolean = sourceIPConstraint _  
+  def constraintFunctionSourceIP[T: ipaddr]: TriTuple => Int => Int => IPPacket[T] => Boolean = {
+    sourceIPConstraint _
+  }
   /*Filters*/
   val max_packet_size = 65535
   val supported_version = 4
@@ -120,38 +123,36 @@ object deepPacketInspection {
   def versionSupported[T]: IPPacket[T] => Boolean = constrainFunctionVersion(equal)(supported_version)
   def ttlGreaterThan0[T]: IPPacket[T] => Boolean = constrainFunctionTTL(greater_than)(0)
   def dataWithShellcode[T]: IPPacket[T] => Boolean = constraintFunctionData(contains)(shellcode_example)
-  def validSourceIPAddress[T]: IPPacket[T] => Boolean = constraintFunctionSourceIP(valid_ip_segment)(0)(255)(implicitly )
+  def validSourceIPAddress[T: ipaddr]: IPPacket[T] => Boolean = {
+    val ip_addr = implicitly[ipaddr[T]]
+    constraintFunctionSourceIP(ip_addr)(validIPRange)(0)(255)
+  }
 }
 
 case class Network(network_name: String)
-trait NetworkIncomingPackets {
-  def getPackets[T](network: Network): Seq[IPPacket[T]]
-}
-
 trait DPIFilters {
-  def filterPackets[T](network: Network): deepPacketInspection.DPIFilter[T]
+  def filterPackets[T]: deepPacketInspection.DPIFilter[T]
 }
 
 //Esto es un mixin... 
 trait MailBoxNetwork {
-  def getfilteredPackets(network: NetworkIncomingPackets, filters: DPIFilters, network_name: Network) =
-    network.getPackets(network_name).filter(filters.filterPackets(network_name))
-  def filteredPackages[T]: Network => Seq[IPPacket[T]]
-}
-
-object SimpleIncomingPackets extends NetworkIncomingPackets {
-  val pack1 = IPPacket(4, 5, 535, 34447, 56, "SSH", "201.34.64.9", "200.12.5.1", "3193793826", "00\\x24\\x8C\\x01\\x79\\x08\\x00\\x24\\x8C\\\\x31\\xc0\\x66\\xba\\x0e\\x27\\x66\\x81\\xea\\x06\\x27\\xb0\\x37\\xcd\\x80\\xAB\\x0A\\x5E")
-  val pack2 = IPPacket(4, 5, 54, 42350, 21, "ICMP", "192.53.1.58", "200.12.5.1", "3229570480", "00\\x24\\x8C\\x01\\x79\\x08\\x00\\x24\\x8C\\x01\\x79\\x06\\x08\\x00\\x45\\x20\\x00\\x3C\\x16\\xDB\\x00\\x00\\x3F\\x06\\xCC\\x8A\\xD5\\xE9\\xAB\\x0A\\x5E\\xB6\\xB8\\x8C\\x05\\x57\\x90\\x1F\\x90\\x30\\x93\\x71\\x75\\xF5\\xDB\\xBA\\xA0\\x12\\x16\\x28\\xEF\\xE6")
-  def getPackets[T >: String](network: Network): Seq[IPPacket[T]] =  Seq(pack1,pack2)
+  def getfilteredPackets[T](packages: Seq[IPPacket[T]], filters: DPIFilters, network_name: Network): Seq[IPPacket[T]] = {
+    packages.filter(filters.filterPackets)
+  }
+  def filteredPackages[T](packages: Seq[IPPacket[T]]): Seq[IPPacket[T]]
 }
 
 object SimpleDPIFilters extends DPIFilters {
   import deepPacketInspection._
-  def filterPackets[T](network: Network): DPIFilter[T] = dataWithShellcode
+  def filterPackets[T]: DPIFilter[T] = {
+    dataWithShellcode
+  }
 }
 
 object SimpleMailBoxNetwork extends MailBoxNetwork {
-  def filteredPackages[T <: Nothing]: Network => Seq[IPPacket[T]] = getfilteredPackets(SimpleIncomingPackets, SimpleDPIFilters,Network(""))
+  def filteredPackages[T](packages: Seq[IPPacket[T]]): Seq[IPPacket[T]] = {
+    getfilteredPackets(packages, SimpleDPIFilters, Network(""))
+  }
 }
 
 class DPITest {
@@ -256,6 +257,51 @@ class DPITest {
     assertTrue(dataWithShellcode(package_shellcoded))
     assertTrue(ttlGreaterThan0(package_shellcoded))
   }
-  
+
+  @Test
+  def `test validIPRange` = {
+    import deepPacketInspection._
+
+    assertTrue(validIPRange(234, 0, 255))
+    assertFalse(validIPRange(274, 0, 255))
+  }
+
+  @Test
+  def `test filter package by IP String` = {
+    import deepPacketInspection._
+    import IPTypes._
+    val correct_package = IPPacket(4, 5, 535, 34447, 56, "SSH", "201.34.64.9", "200.12.5.1", "3193793826", "00\\x24\\x8C\\x01\\x79\\x08\\x00\\x24\\x8C\\\\x31\\xc0\\x66\\xba\\x0e\\x27\\x66\\x81\\xea\\x06\\x27\\xb0\\x37\\xcd\\x80\\xAB\\x0A\\x5E")
+    val incorrect_package = IPPacket(4, 5, 535, 34447, 56, "SSH", "503.34.64.9", "200.12.5.1", "3193793826", "00\\x24\\x8C\\x01\\x79\\x08\\x00\\x24\\x8C\\\\x31\\xc0\\x66\\xba\\x0e\\x27\\x66\\x81\\xea\\x06\\x27\\xb0\\x37\\xcd\\x80\\xAB\\x0A\\x5E")
+
+    implicit val ip_addr = ipaddr.ippaddrString
+
+    assertTrue(validSourceIPAddress(ip_addr)(correct_package))
+    assertFalse(validSourceIPAddress(ip_addr)(incorrect_package))
+  }
+
+  @Test
+  def `test filter package by IP tuple` = {
+    import deepPacketInspection._
+    import IPTypes._
+    val correct_package = IPPacket(4, 5, 535, 34447, 56, "SSH", (201, 34, 64, 9), (200, 12, 5, 1), "3193793826", "00\\x24\\x8C\\x01\\x79\\x08\\x00\\x24\\x8C\\\\x31\\xc0\\x66\\xba\\x0e\\x27\\x66\\x81\\xea\\x06\\x27\\xb0\\x37\\xcd\\x80\\xAB\\x0A\\x5E")
+    val incorrect_package = IPPacket(4, 5, 535, 34447, 56, "SSH", (503, 34, 64, 9), (200, 12, 5, 1), "3193793826", "00\\x24\\x8C\\x01\\x79\\x08\\x00\\x24\\x8C\\\\x31\\xc0\\x66\\xba\\x0e\\x27\\x66\\x81\\xea\\x06\\x27\\xb0\\x37\\xcd\\x80\\xAB\\x0A\\x5E")
+
+    implicit val ip_addr = ipaddr.ippaddrTuple
+
+    assertTrue(validSourceIPAddress(ip_addr)(correct_package))
+    assertFalse(validSourceIPAddress(ip_addr)(incorrect_package))
+  }
+
   /*TODO: test integral*/
+  @Test
+  def `test integral` = {
+    val pack1 = IPPacket(4, 5, 535, 34447, 56, "SSH", "201.34.64.9", "200.12.5.1", "3193793826", "00\\x24\\x8C\\x01\\x79\\x08\\x00\\x24\\x8C\\\\x31\\xc0\\x66\\xba\\x0e\\x27\\x66\\x81\\xea\\x06\\x27\\xb0\\x37\\xcd\\x80\\xAB\\x0A\\x5E")
+    val pack2 = IPPacket(4, 5, 54, 42350, 21, "ICMP", "192.53.1.58", "200.12.5.1", "3229570480", "00\\x24\\x8C\\x01\\x79\\x08\\x00\\x24\\x8C\\x01\\x79\\x06\\x08\\x00\\x45\\x20\\x00\\x3C\\x16\\xDB\\x00\\x00\\x3F\\x06\\xCC\\x8A\\xD5\\xE9\\xAB\\x0A\\x5E\\xB6\\xB8\\x8C\\x05\\x57\\x90\\x1F\\x90\\x30\\x93\\x71\\x75\\xF5\\xDB\\xBA\\xA0\\x12\\x16\\x28\\xEF\\xE6")
+    val packages = Seq(pack1, pack2)
+    val expected_seq = Seq(pack1)
+
+    assertEquals(expected_seq, SimpleMailBoxNetwork.filteredPackages(packages))
+
+  }
+
 }
