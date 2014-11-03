@@ -292,7 +292,7 @@ class DPITest {
     assertFalse(validSourceIPAddress(ip_addr)(incorrect_package))
   }
 
-  /*TODO: test integral*/
+  /*test integral*/
   @Test
   def `test integral` = {
     val pack1 = IPPacket(4, 5, 535, 34447, 56, "SSH", "201.34.64.9", "200.12.5.1", "3193793826", "00\\x24\\x8C\\x01\\x79\\x08\\x00\\x24\\x8C\\\\x31\\xc0\\x66\\xba\\x0e\\x27\\x66\\x81\\xea\\x06\\x27\\xb0\\x37\\xcd\\x80\\xAB\\x0A\\x5E")
